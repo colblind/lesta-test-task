@@ -1,15 +1,19 @@
 from constants import GRID_SIZE
 from typing import List, Tuple
 
+from game_object import GameObject
+
 
 class Board:
+    _grid: List[List[GameObject | None]]
+
     def __init__(self):
         self._grid = [[None for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
 
-    def place_object(self, x: int, y: int, obj: object) -> None:
+    def place_object(self, x: int, y: int, obj: GameObject) -> None:
         self._grid[y][x] = obj
 
-    def get_object(self, x: int, y: int) -> object:
+    def get_object(self, x: int, y: int) -> GameObject:
         return self._grid[y][x]
 
     def is_cell_empty(self, x: int, y: int) -> bool:
@@ -33,7 +37,7 @@ class Board:
                 positions.append((x, y))
         return positions
 
-    def get_grid(self) -> List[List[object]]:
+    def get_grid(self) -> List[List[GameObject | None]]:
         return self._grid
 
     def clear_cell(self, x: int, y: int) -> None:

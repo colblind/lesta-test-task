@@ -1,82 +1,107 @@
 from random import randint
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 
-import constants
 from board import Board
-from obstacles import HighIsland, LowIsland, Obstacle
-from ships import Cruiser, Destroyer, Battleship, Ship
-from player import Player
-from core import GameAPI
 from combat import Combat
+from constants import Sprite
+from core import GameAPI
+from obstacles import Island, Cliff, Obstacle
+from player import Player
+
+from radars.crossline import CrossLineRadar
+from radars.weak import WeakRadar
+from ships.base import Ship
+from ships.battleship import Battleship
+from ships.cruiser import Cruiser
+from ships.destroyer import Destroyer
+
+
+if TYPE_CHECKING:
+    from core import Image, Marker
+    from game_object import GameObject
 
 
 class Game(object):
+    board: Board
+
+    players: List[Player]
+    current_player_index: int
+
+    _markers: dict[Ship, "Marker"]
+    _images: dict["GameObject", "Image"]
+
+    _game_over: bool
+
     def __init__(self):
-        self.board: Board = None
-        self.players: List[Player] = []
+        self.board = Board()
+        self.players = []
         self.current_player_index = 0
-        self.api: GameAPI = None
         self._markers = {}
         self._images = {}
         self._game_over = False
 
     def start(self, api: GameAPI) -> None:
-        self.api = api
-        self.board = Board()
         self.players = self._create_players()
         self._place_ships()
         self._create_islands()
-        self._update_ui()
-        self.api.addMessage('Game started. {} turn'.format(self.get_current_player().name))
+        self._update_ui(api)
+
+        api.addMessage('Игра началась. {} ходят'.format(self.get_current_player().name))
 
     def click(self, api: GameAPI, x: int, y: int) -> None:
-        selected_ship = self.get_current_player().get_selected_ship()
+        if self._game_over:
+            return
+
+        current_player = self.get_current_player()
+        selected_ship = current_player.get_selected_ship()
         clicked_object = self.board.get_object(x, y)
 
         if selected_ship:
+            initial_pos = '{}{}'.format(chr(65 + selected_ship.position[0]), selected_ship.position[1] + 1)
+            final_pos = '{}{}'.format(chr(65 + x), y + 1)
+
             if (x, y) == selected_ship.position:
-                self._unselect_ship()
+                self._unselect_ship(api)
             elif self._move_ship(selected_ship, x, y):
-                self._attack_and_change_turn(selected_ship)
+                self._attack_and_change_turn(api)
+                api.addMessage('{} ходят {}->{}'.format(current_player.name, initial_pos, final_pos))
             return
 
         if isinstance(clicked_object, Ship) and clicked_object in self.get_current_player().get_ships():
-            self._select_ship(clicked_object)
+            self._select_ship(clicked_object, api)
 
     def _create_players(self) -> List[Player]:
-        red_ships = self._create_ships(constants.Sprite.RED_TEAM)
-        green_ships = self._create_ships(constants.Sprite.GREEN_TEAM)
+        red_ships = self._create_ships(Sprite.RED_TEAM)
+        green_ships = self._create_ships(Sprite.GREEN_TEAM)
 
         return [
-            Player("Red", red_ships),
-            Player("Green", green_ships)
+            Player("Красные", red_ships),
+            Player("Зеленые", green_ships)
         ]
 
     def _create_ships(self, team_sprites: Tuple[str]) -> List[Ship]:
         return [
-            Destroyer(team_sprites[0]),
-            Cruiser(team_sprites[1]),
-            Battleship(team_sprites[2]),
+            Destroyer(team_sprites[0], radar=WeakRadar(self.board)),
+            Cruiser(team_sprites[1], radar=CrossLineRadar(self.board)),
+            Battleship(team_sprites[2], radar=CrossLineRadar(self.board)),
         ]
 
     def _place_ships(self) -> None:
-        positions = {
-            "red": [(6, 1), (6, 3), (6, 5)],
-            "green": [(0, 1), (0, 3), (0, 5)]
-        }
-        for player in self.players:
-            for i, ship in enumerate(player.get_ships()):
-                if player.name == "Red":
-                    x, y = positions["red"][i]
-                elif player.name == "Green":
-                    x, y = positions["green"][i]
+        initial_positions = [
+            [(6, 1), (6, 3), (6, 5)],
+            [(0, 1), (0, 3), (0, 5)]
+        ]
+
+        for i, player in enumerate(self.players):
+            for j, ship in enumerate(player.get_ships()):
+                x, y = initial_positions[i][j]
 
                 ship.set_position(x, y)
                 self.board.place_object(x, y, ship)
 
     def _create_islands(self) -> None:
         island_count = randint(5, 15)
-        island_sprites = [constants.Sprite.ISLAND, constants.Sprite.CLIFF]
+        island_sprites = [Sprite.ISLAND, Sprite.CLIFF]
         available_positions = self.board.get_all_positions()
 
         for _ in range(island_count):
@@ -88,12 +113,13 @@ class Game(object):
 
             if self.board.is_cell_empty(x, y):
                 sprite = island_sprites[randint(0, 1)]
-                island = HighIsland(sprite) if sprite == constants.Sprite.CLIFF else LowIsland(sprite)
+                island = Island(sprite) if sprite == Sprite.CLIFF else Cliff(sprite)
                 island.set_position(x, y)
                 self.board.place_object(x, y, island)
 
     def _move_ship(self, ship: Ship, x: int, y: int) -> bool:
         dist = ((x - ship.position[0]) ** 2 + (y - ship.position[1]) ** 2) ** 0.5
+
         if dist <= ship.speed:
             self.board.clear_cell(ship.position[0], ship.position[1])
             ship.set_position(x, y)
@@ -101,21 +127,20 @@ class Game(object):
             return True
         return False
 
-    def _unselect_ship(self) -> None:
-        selected_ship = self.get_current_player().get_selected_ship()
+    def _unselect_ship(self, api: GameAPI) -> None:
         self.get_current_player().set_selected_ship(None)
-        self._update_ui()
+        self._update_ui(api)
 
-        self.api.addMessage('{} unselected'.format(selected_ship))
+    def _select_ship(self, ship: Ship, api: GameAPI) -> None:
+        current_player = self.get_current_player()
+        current_player.set_selected_ship(ship)
 
-    def _select_ship(self, ship: Ship) -> None:
-        self.get_current_player().set_selected_ship(ship)
-        self._update_ui()
-        self.api.addMessage('{} selected'.format(ship))
+        self._update_ui(api)
 
-    def _attack_and_change_turn(self, moved_ship: Ship):
+        api.addMessage('{} выбирают {}'.format(current_player.name, ship))
 
-        combat = Combat(self.board)
+    def _attack_and_change_turn(self, api: GameAPI):
+        combat = Combat
 
         enemy_ships = self._get_enemy_ships()
 
@@ -124,16 +149,17 @@ class Game(object):
         for ship in enemy_ships:
             combat.attack(ship, current_player.get_ships())
 
-        self._remove_dead_ships()
-        self._next_player()
-        self._update_ui()
+        self._remove_dead_ships(api)
+        self._next_player(api)
+        self._update_ui(api)
 
     def _get_enemy_ships(self) -> List[Ship]:
         enemy_index = (self.current_player_index + 1) % len(self.players)
         enemy_ships = self.players[enemy_index].get_ships()
+
         return enemy_ships
 
-    def _remove_dead_ships(self) -> None:
+    def _remove_dead_ships(self, api: GameAPI) -> None:
         for player in self.players:
             ships_to_remove = []
             for ship in player.get_ships():
@@ -142,29 +168,35 @@ class Game(object):
 
             for ship in ships_to_remove:
                 self.board.clear_cell(ship.position[0], ship.position[1])
+
                 player.remove_ship(ship)
-                self.api.addMessage('{} was destroyed'.format(ship))
 
-        self._check_for_winner()
+                api.addMessage('{} уничтожен!'.format(ship))
 
-    def _check_for_winner(self) -> None:
+        self._check_for_winner(api)
+
+    def _check_for_winner(self, api: GameAPI) -> None:
         for player in self.players:
             if not player.get_ships():
                 winner = self.players[(self.players.index(player) + 1) % 2]
-                self.api.addMessage('{} win!'.format(winner.name))
+
                 self._game_over = True
 
-    def _next_player(self) -> None:
+                api.addMessage('{} побеждают!'.format(winner.name))
+
+    def _next_player(self, api: GameAPI) -> None:
         if self._game_over:
             return
+
         self.get_current_player().set_selected_ship(None)
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
-        self.api.addMessage('{} turn'.format(self.get_current_player().name))
+
+        api.addMessage('{} ходят'.format(self.get_current_player().name))
 
     def get_current_player(self) -> Player:
         return self.players[self.current_player_index]
 
-    def _update_ui(self) -> None:
+    def _update_ui(self, api: GameAPI) -> None:
         objects_on_board = set()
         for row in self.board.get_grid():
             for obj in row:
@@ -195,7 +227,7 @@ class Game(object):
                             else:
                                 marker.setSelected(False)
                         else:
-                            marker = self.api.addMarker(obj.sprite_path, x, y)
+                            marker = api.addMarker(obj.sprite_path, x, y)
                             marker.setHealth(obj.health / obj.max_health)
                             if obj == self.get_current_player().get_selected_ship():
                                 marker.setSelected(True)
@@ -205,5 +237,5 @@ class Game(object):
                             image = self._images[obj]
                             image.setPosition(x, y)
                         else:
-                            image = self.api.addImage(obj.sprite_path, x, y)
+                            image = api.addImage(obj.sprite_path, x, y)
                             self._images[obj] = image

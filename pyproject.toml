@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "lesta-test-task"
 version = "0.1.0"
-description = ""
+description = "Test task for Lesta Games LLC"
 authors = ["colblind <brobee1001@gmail.com>"]
 readme = "README.md"
 
