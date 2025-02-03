@@ -9,12 +9,9 @@ from obstacles import Cliff, Island
 from obstacles.base import Obstacle
 from player import Player
 
-from radars.crossline import CrossLineRadar
-from radars.weak import WeakRadar
+from radars import CrossLineRadar, WeakRadar
 from ships.base import Ship
-from ships.battleship import Battleship
-from ships.cruiser import Cruiser
-from ships.destroyer import Destroyer
+from ships import Battleship, Cruiser, Destroyer
 
 
 if TYPE_CHECKING:
