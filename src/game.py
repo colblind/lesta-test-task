@@ -102,7 +102,7 @@ class Game(object):
     def _create_islands(self) -> None:
         island_count = randint(5, 15)
         island_sprites = [Sprite.ISLAND, Sprite.CLIFF]
-        available_positions = self.board.get_all_positions()
+        available_positions = self.board.get_empty_positions()
 
         for _ in range(island_count):
             if not available_positions:
@@ -113,19 +113,23 @@ class Game(object):
 
             if self.board.is_cell_empty(x, y):
                 sprite = island_sprites[randint(0, 1)]
-                island = Island(sprite) if sprite == Sprite.CLIFF else Cliff(sprite)
+                island = Cliff(sprite) if sprite == Sprite.CLIFF else Island(sprite)
                 island.set_position(x, y)
                 self.board.place_object(x, y, island)
 
     def _move_ship(self, ship: Ship, x: int, y: int) -> bool:
         dist = ((x - ship.position[0]) ** 2 + (y - ship.position[1]) ** 2) ** 0.5
 
-        if dist <= ship.speed:
-            self.board.clear_cell(ship.position[0], ship.position[1])
-            ship.set_position(x, y)
-            self.board.place_object(x, y, ship)
-            return True
-        return False
+        if dist > ship.speed:
+            return False
+
+        if not self.board.is_cell_empty(x, y):
+            return False
+
+        self.board.clear_cell(ship.position[0], ship.position[1])
+        ship.set_position(x, y)
+        self.board.place_object(x, y, ship)
+        return True
 
     def _unselect_ship(self, api: GameAPI) -> None:
         self.get_current_player().set_selected_ship(None)
@@ -150,6 +154,7 @@ class Game(object):
             combat.attack(ship, current_player.get_ships())
 
         self._remove_dead_ships(api)
+        self._check_for_winner(api)
         self._next_player(api)
         self._update_ui(api)
 
@@ -173,8 +178,6 @@ class Game(object):
 
                 api.addMessage('{} уничтожен!'.format(ship))
 
-        self._check_for_winner(api)
-
     def _check_for_winner(self, api: GameAPI) -> None:
         for player in self.players:
             if not player.get_ships():
@@ -183,6 +186,8 @@ class Game(object):
                 self._game_over = True
 
                 api.addMessage('{} побеждают!'.format(winner.name))
+
+                return
 
     def _next_player(self, api: GameAPI) -> None:
         if self._game_over:

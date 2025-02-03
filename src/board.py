@@ -37,6 +37,14 @@ class Board:
                 positions.append((x, y))
         return positions
 
+    def get_empty_positions(self):
+        positions = []
+        for y in range(GRID_SIZE):
+            for x in range(GRID_SIZE):
+                if self.is_cell_empty(x, y):
+                    positions.append((x, y))
+        return positions
+
     def get_grid(self) -> List[List[GameObject | None]]:
         return self._grid
 
