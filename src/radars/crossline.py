@@ -1,7 +1,7 @@
 from typing import List
 
 from board import Board
-from obstacles import Island
+from obstacles import Cliff
 
 from radars.base import Radar, TargetData
 from ships.base import Ship
@@ -32,12 +32,12 @@ class CrossLineRadar(Radar):
             start, end = min(y1, y2), max(y1, y2)
             for y in range(start + 1, end):
                 obj = self.board.get_object(x1, y)
-                if obj and isinstance(obj, Island):
+                if obj and isinstance(obj, Cliff):
                     return True
         elif y1 == y2:
             start, end = min(x1, x2), max(x1, x2)
             for x in range(start + 1, end):
                 obj = self.board.get_object(x, y1)
-                if obj and isinstance(obj, Island):
+                if obj and isinstance(obj, Cliff):
                     return True
         return False

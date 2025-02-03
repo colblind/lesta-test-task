@@ -63,6 +63,7 @@ class Game(object):
             elif self._move_ship(selected_ship, x, y):
                 self._attack_and_change_turn(api)
                 api.addMessage('{} ходят {}->{}'.format(current_player.name, initial_pos, final_pos))
+                api.addMessage('{} ходят'.format(self.get_current_player().name))
             return
 
         if isinstance(clicked_object, Ship) and clicked_object in self.get_current_player().get_ships():
@@ -153,7 +154,7 @@ class Game(object):
 
         self._remove_dead_ships(api)
         self._check_for_winner(api)
-        self._next_player(api)
+        self._next_player()
         self._update_ui(api)
 
     def _get_enemy_ships(self) -> List[Ship]:
@@ -187,14 +188,12 @@ class Game(object):
 
                 return
 
-    def _next_player(self, api: GameAPI) -> None:
+    def _next_player(self) -> None:
         if self._game_over:
             return
 
         self.get_current_player().set_selected_ship(None)
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
-
-        api.addMessage('{} ходят'.format(self.get_current_player().name))
 
     def get_current_player(self) -> Player:
         return self.players[self.current_player_index]
