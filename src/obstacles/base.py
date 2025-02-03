@@ -13,19 +13,3 @@ class Obstacle(GameObject):
 
     def __str__(self):
         return 'препятствие'
-
-
-class Island(Obstacle):
-    def __init__(self, sprite_path: str):
-        super().__init__(sprite_path)
-
-    def __str__(self):
-        return 'остров'
-
-
-class Cliff(Obstacle):
-    def __init__(self, sprite_path: str):
-        super().__init__(sprite_path)
-
-    def __str__(self):
-        return 'скала'
