@@ -5,7 +5,8 @@ from board import Board
 from combat import Combat
 from constants import Sprite
 from core import GameAPI
-from obstacles import Island, Cliff, Obstacle
+from obstacles import Cliff, Island
+from obstacles.base import Obstacle
 from player import Player
 
 from radars.crossline import CrossLineRadar
